@@ -1,6 +1,17 @@
+---
+title: Company Knowledge Agent
+emoji: 🤖
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 8501
+app_file: app.py
+pinned: false
+---
+
 # 🤖 Company Knowledge Agent
 
-> **Live Demo** → [Try it on Hugging Face](https://huggingface.co/spaces/YOUR_USERNAME/YOUR_SPACE_NAME)  
+> **Live Demo** → [Try it on Hugging Face](https://huggingface.co/spaces/khaledxd/company-knowledge-agent)  
 > **Built with** LangGraph · LlamaIndex · Qdrant · MySQL · GPT-4o · Ollama · Streamlit
 
 ---
@@ -18,18 +29,16 @@ Supports **Arabic and English** out of the box.
 
 ## How it works
 
-```
 User asks a question
-        ↓
-   router_node         ← GPT-4o decides: docs or sql?
-        ↓                      ↓
-   docs_node            sql_node
-        ↓                      ↓
-  Qdrant search        LLM generates SQL
-  (RAG retrieval)      MySQL runs query
-        ↓                      ↓
-         Answer back to user
-```
+↓
+router_node         ← GPT-4o decides: docs or sql?
+↓                      ↓
+docs_node            sql_node
+↓                      ↓
+Qdrant search        LLM generates SQL
+(RAG retrieval)      MySQL runs query
+↓                      ↓
+Answer back to user
 
 **Sensitive questions** (salary, personal data) are detected by keyword and routed to a **local Ollama model** — the data never leaves the machine.
 
@@ -52,7 +61,6 @@ User asks a question
 
 ## Project Structure
 
-```
 company_agent_project/
 ├── app.py                  # Streamlit UI (chat + document upload)
 ├── main.py                 # CLI mode for local testing
@@ -63,20 +71,18 @@ company_agent_project/
 │   └── manuals/            # Place your PDF/TXT/DOCX files here
 │
 └── src/
-    ├── graph/
-    │   ├── state.py        # Shared memory between all nodes
-    │   ├── nodes.py        # router_node, docs_node, sql_node
-    │   └── workflow.py     # LangGraph graph assembly
-    │
-    ├── db/
-    │   ├── sql_client.py   # MySQL connection + SQL safety guard
-    │   └── vector_store.py # Qdrant setup + document upload
-    │
-    └── tools/
-        ├── mcp_tools.py    # MCP tool registry (all service calls)
-        └── custom_tools.py # Utility functions
-```
-
+├── graph/
+│   ├── state.py        # Shared memory between all nodes
+│   ├── nodes.py        # router_node, docs_node, sql_node
+│   └── workflow.py     # LangGraph graph assembly
+│
+├── db/
+│   ├── sql_client.py   # MySQL connection + SQL safety guard
+│   └── vector_store.py # Qdrant setup + document upload
+│
+└── tools/
+├── mcp_tools.py    # MCP tool registry (all service calls)
+└── custom_tools.py # Utility functions
 ---
 
 ## Key Design Decisions
@@ -99,7 +105,7 @@ Document vectors are stored permanently in Qdrant's Docker volume. On every rest
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/YOUR_USERNAME/company-knowledge-agent.git
+git clone https://github.com/khaled-abdulaziz/company-knowledge-agent.git
 cd company-knowledge-agent
 ```
 
@@ -125,10 +131,7 @@ ollama pull llama3
 ```
 
 ### 5. Add your documents
-```
 Drop your PDF / TXT / DOCX files into data/manuals/
-```
-
 ### 6. Run the app
 ```bash
 streamlit run app.py
@@ -145,26 +148,20 @@ python main.py
 
 Copy `.env.example` to `.env` and fill in:
 
-```
-OPENAI_API_KEY        your OpenAI key
-OPENAI_MODEL          gpt-4o
+OPENAI_API_KEY         your OpenAI key
+OPENAI_MODEL           gpt-4o
 OPENAI_EMBEDDING_MODEL text-embedding-3-small
-
-OLLAMA_BASE_URL       http://localhost:11434
-OLLAMA_MODEL          llama3
-
-MYSQL_HOST            localhost
-MYSQL_PORT            3306
-MYSQL_USER            your_user
-MYSQL_PASSWORD        your_password
-MYSQL_DB              company_db
-
-QDRANT_HOST           localhost
-QDRANT_PORT           6333
-QDRANT_COLLECTION     company_docs
-
-SENSITIVE_KEYWORDS    salary,password,national_id,address,marital_status
-```
+OLLAMA_BASE_URL        http://localhost:11434
+OLLAMA_MODEL           llama3
+MYSQL_HOST             localhost
+MYSQL_PORT             3306
+MYSQL_USER             your_user
+MYSQL_PASSWORD         your_password
+MYSQL_DB               company_db
+QDRANT_HOST            localhost
+QDRANT_PORT            6333
+QDRANT_COLLECTION      company_docs
+SENSITIVE_KEYWORDS     salary,password,national_id,address,marital_status
 
 ---
 
@@ -193,4 +190,4 @@ Enter it in the sidebar before chatting. Your key is never stored or logged.
 
 ## Author
 
-Built by khaled — https://www.linkedin.com/in/khaled-abdulaziz/ · https://github.com/khaled-abdulaziz
+Built by Khaled abdulaziz · [LinkedIn](https://www.linkedin.com/in/khaled-abdulaziz/) · [GitHub](https://github.com/khaled-abdulaziz)
