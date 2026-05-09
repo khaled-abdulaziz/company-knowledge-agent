@@ -1,3 +1,2 @@
 libmagic1
 libmagic-dev
-file
