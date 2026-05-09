@@ -136,7 +136,6 @@ if "api_key_set" not in st.session_state:
 if "indexed_count" not in st.session_state:
     st.session_state.indexed_count = 0
 
-# CHANGE: store uploaded files in session state so they survive reruns
 if "upload_error" not in st.session_state:
     st.session_state.upload_error = None
 
@@ -250,9 +249,6 @@ with st.sidebar:
     if not st.session_state.api_key_set:
         st.caption("Enter your API key above to enable uploads.")
     else:
-        # CHANGE: file uploader and button are now completely separate
-        # The button is always visible once the uploader appears
-        # This prevents Streamlit from hiding the button on rerun
         uploaded_files = st.file_uploader(
             "PDF, TXT or DOCX",
             accept_multiple_files=True,
@@ -263,36 +259,33 @@ with st.sidebar:
 
         force_reindex = st.checkbox("Force re-index (replace existing)", value=False)
 
-        # Show file list if files are selected
+        # DEBUG — tells us exactly what Streamlit sees after you pick a file
+        # We will remove this line once the upload works
+        st.caption(f"🔍 Debug: {len(uploaded_files) if uploaded_files else 0} file(s) detected by Streamlit")
+
         if uploaded_files:
             for f in uploaded_files:
-                st.markdown(f"📄 `{f.name}`")
+                st.markdown(f"📄 `{f.name}` — {f.size} bytes")
 
-        # CHANGE: button is ALWAYS shown — not inside if uploaded_files
-        # This way Streamlit never hides it between reruns
         upload_clicked = st.button(
             "📤 Upload & Index",
             use_container_width=True,
             type="primary",
-            disabled=not uploaded_files,  # greyed out when no files selected
+            disabled=not uploaded_files,
         )
 
-        # Show previous success/error messages that survived the rerun
         if st.session_state.upload_success:
             st.success(st.session_state.upload_success)
         if st.session_state.upload_error:
             st.error(st.session_state.upload_error)
 
-        # Handle the upload when button is clicked
         if upload_clicked and uploaded_files:
-            # Clear previous messages
             st.session_state.upload_success = None
             st.session_state.upload_error   = None
 
             progress = st.progress(0, text="Preparing files...")
 
             with tempfile.TemporaryDirectory() as tmp_dir:
-                # Save each uploaded file to the temp folder
                 for i, f in enumerate(uploaded_files):
                     dest = os.path.join(tmp_dir, f.name)
                     with open(dest, "wb") as out:
@@ -302,15 +295,14 @@ with st.sidebar:
                         text=f"Saved {f.name}..."
                     )
 
-                # Index all files into Qdrant
                 progress.progress(60, text="Indexing into knowledge base...")
                 try:
                     upload_documents(data_path=tmp_dir, force=force_reindex)
                     progress.progress(100, text="✅ Done!")
 
-                    st.session_state.docs_loaded     = True
-                    st.session_state.indexed_count   = len(uploaded_files)
-                    st.session_state.upload_success  = (
+                    st.session_state.docs_loaded    = True
+                    st.session_state.indexed_count  = len(uploaded_files)
+                    st.session_state.upload_success = (
                         f"✅ {len(uploaded_files)} file(s) indexed! "
                         f"You can now start chatting."
                     )
@@ -322,7 +314,6 @@ with st.sidebar:
                     st.session_state.upload_error = f"❌ Upload failed: {str(e)}"
                     st.rerun()
 
-        # Always show knowledge base status
         st.markdown("---")
         if st.session_state.docs_loaded:
             st.markdown(
@@ -344,7 +335,6 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-    # ── Info ───────────────────────────────────────────────────
     st.markdown("---")
     st.markdown(
         '<p style="font-size:12px;color:#484f58;line-height:1.6">'
