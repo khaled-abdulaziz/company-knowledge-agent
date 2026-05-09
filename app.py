@@ -288,7 +288,7 @@ with st.sidebar:
         '<p style="font-size:12px;color:#484f58;line-height:1.6">'
         'Supports Arabic & English.<br>'
         'Your API key is used only in this session and never stored.<br><br>'
-        '<a href="https://github.com/YOUR_USERNAME/YOUR_REPO" '
+        '<a href="https://github.com/khaled-abdulaziz/company-knowledge-agent" '
         'target="_blank" style="color:#58a6ff">View source on GitHub →</a>'
         '</p>',
         unsafe_allow_html=True
