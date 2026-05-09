@@ -133,9 +133,15 @@ if "docs_loaded" not in st.session_state:
 if "api_key_set" not in st.session_state:
     st.session_state.api_key_set = False
 
-# Track how many files are indexed so we can show it
 if "indexed_count" not in st.session_state:
     st.session_state.indexed_count = 0
+
+# CHANGE: store uploaded files in session state so they survive reruns
+if "upload_error" not in st.session_state:
+    st.session_state.upload_error = None
+
+if "upload_success" not in st.session_state:
+    st.session_state.upload_success = None
 
 
 # ==============================================================
@@ -158,9 +164,7 @@ with st.sidebar:
     )
 
     if user_api_key and user_api_key.startswith("sk-"):
-        
         os.environ["OPENAI_API_KEY"] = user_api_key
-
         try:
             from src.tools import mcp_tools as _mcp
             from openai import OpenAI as _OAI
@@ -193,7 +197,6 @@ with st.sidebar:
     # ── System status ──────────────────────────────────────────
     st.markdown('<p class="sidebar-section">System status</p>', unsafe_allow_html=True)
 
-    # Qdrant
     try:
         from src.db.vector_store import get_qdrant_client
         get_qdrant_client().get_collections()
@@ -207,7 +210,6 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
-    # Ollama 
     ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     if "localhost" in ollama_url or "127.0.0.1" in ollama_url:
         st.markdown(
@@ -231,7 +233,6 @@ with st.sidebar:
                 unsafe_allow_html=True
             )
 
-    # Knowledge base status
     if st.session_state.docs_loaded:
         st.markdown(
             '<span class="status-dot dot-green"></span> Knowledge base ready',
@@ -247,71 +248,92 @@ with st.sidebar:
     st.markdown('<p class="sidebar-section">Upload documents</p>', unsafe_allow_html=True)
 
     if not st.session_state.api_key_set:
-        
         st.caption("Enter your API key above to enable uploads.")
     else:
+        # CHANGE: file uploader and button are now completely separate
+        # The button is always visible once the uploader appears
+        # This prevents Streamlit from hiding the button on rerun
         uploaded_files = st.file_uploader(
             "PDF, TXT or DOCX",
             accept_multiple_files=True,
             type=["pdf", "txt", "docx"],
             label_visibility="collapsed",
+            key="file_uploader",
         )
 
         force_reindex = st.checkbox("Force re-index (replace existing)", value=False)
 
+        # Show file list if files are selected
         if uploaded_files:
-            # Show filenames so user knows the files were received
-            st.markdown("**Files ready to upload:**")
             for f in uploaded_files:
                 st.markdown(f"📄 `{f.name}`")
 
-            if st.button("📤 Upload & Index", use_container_width=True, type="primary"):
-                progress = st.progress(0, text="Preparing files...")
+        # CHANGE: button is ALWAYS shown — not inside if uploaded_files
+        # This way Streamlit never hides it between reruns
+        upload_clicked = st.button(
+            "📤 Upload & Index",
+            use_container_width=True,
+            type="primary",
+            disabled=not uploaded_files,  # greyed out when no files selected
+        )
 
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    # Save each file to temp folder and update progress
-                    for i, f in enumerate(uploaded_files):
-                        dest = os.path.join(tmp_dir, f.name)
-                        with open(dest, "wb") as out:
-                            out.write(f.read())
-                        progress.progress(
-                            int((i + 1) / len(uploaded_files) * 50),
-                            text=f"Saved {f.name}..."
-                        )
+        # Show previous success/error messages that survived the rerun
+        if st.session_state.upload_success:
+            st.success(st.session_state.upload_success)
+        if st.session_state.upload_error:
+            st.error(st.session_state.upload_error)
 
-                    # Index all files into Qdrant
-                    progress.progress(60, text="Indexing into knowledge base...")
-                    try:
-                        upload_documents(data_path=tmp_dir, force=force_reindex)
-                        progress.progress(100, text="✅ Done!")
+        # Handle the upload when button is clicked
+        if upload_clicked and uploaded_files:
+            # Clear previous messages
+            st.session_state.upload_success = None
+            st.session_state.upload_error   = None
 
-                        # Update session state so chat unlocks immediately
-                        st.session_state.docs_loaded = True
-                        st.session_state.indexed_count = len(uploaded_files)
+            progress = st.progress(0, text="Preparing files...")
 
-                        st.success(
-                            f"✅ {len(uploaded_files)} file(s) uploaded and indexed! "
-                            f"You can now start chatting."
-                        )
-                        time.sleep(1.5)
-                        st.rerun()
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                # Save each uploaded file to the temp folder
+                for i, f in enumerate(uploaded_files):
+                    dest = os.path.join(tmp_dir, f.name)
+                    with open(dest, "wb") as out:
+                        out.write(f.read())
+                    progress.progress(
+                        int((i + 1) / len(uploaded_files) * 50),
+                        text=f"Saved {f.name}..."
+                    )
 
-                    except Exception as e:
-                        progress.empty()
-                        st.error(f"❌ Upload failed: {str(e)}")
+                # Index all files into Qdrant
+                progress.progress(60, text="Indexing into knowledge base...")
+                try:
+                    upload_documents(data_path=tmp_dir, force=force_reindex)
+                    progress.progress(100, text="✅ Done!")
 
-        # Always show current knowledge base status below uploader
+                    st.session_state.docs_loaded     = True
+                    st.session_state.indexed_count   = len(uploaded_files)
+                    st.session_state.upload_success  = (
+                        f"✅ {len(uploaded_files)} file(s) indexed! "
+                        f"You can now start chatting."
+                    )
+                    time.sleep(1)
+                    st.rerun()
+
+                except Exception as e:
+                    progress.empty()
+                    st.session_state.upload_error = f"❌ Upload failed: {str(e)}"
+                    st.rerun()
+
+        # Always show knowledge base status
         st.markdown("---")
         if st.session_state.docs_loaded:
             st.markdown(
                 '<span class="status-dot dot-green"></span> '
-                'Knowledge base has documents — ready to chat.',
+                'Knowledge base ready — start chatting.',
                 unsafe_allow_html=True
             )
         else:
             st.markdown(
                 '<span class="status-dot dot-red"></span> '
-                'No documents yet — upload files above to start.',
+                'No documents yet — upload files above.',
                 unsafe_allow_html=True
             )
 
@@ -341,7 +363,6 @@ with st.sidebar:
 
 st.markdown("### 💬 Ask anything about your company")
 
-# Block everything until API key is entered
 if not st.session_state.api_key_set:
     st.markdown("""
     <div class="empty-state">
@@ -358,7 +379,6 @@ if not st.session_state.api_key_set:
     """, unsafe_allow_html=True)
     st.stop()
 
-# Block chat until documents are uploaded
 if not st.session_state.docs_loaded:
     st.markdown("""
     <div class="empty-state">
@@ -367,7 +387,7 @@ if not st.session_state.docs_loaded:
             Use the sidebar on the left to upload your PDF, TXT, or DOCX files.<br>
             Once indexed, you can ask questions in Arabic or English.<br><br>
             <span style="color:#d29922">
-                ⬅️ Click "Upload & Index" in the sidebar after selecting your files.
+                ⬅️ Select files then click Upload & Index in the sidebar.
             </span>
         </p>
     </div>
@@ -420,13 +440,11 @@ else:
 question = st.chat_input("Ask a question in Arabic or English...")
 
 if question:
-    # Add user message to history
     st.session_state.messages.append({
         "role":    "user",
         "content": question,
     })
 
-    # Run the full agent pipeline
     with st.spinner("Thinking..."):
         try:
             result = run_agent(question)
