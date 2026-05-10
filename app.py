@@ -35,6 +35,10 @@ st.markdown("""
 
     #MainMenu, footer, header { visibility: hidden; }
 
+    /* ── FIX: Hide the << collapse arrow so sidebar can't be hidden ── */
+    [data-testid="collapsedControl"]          { display: none !important; }
+    button[data-testid="baseButton-header"]   { display: none !important; }
+
     [data-testid="stSidebar"] {
         background-color: #0f1117;
         border-right: 1px solid #1e2130;
@@ -152,11 +156,8 @@ with st.sidebar:
     st.markdown("---")
 
     # ── Settings expander — API key + clear chat ───────────────
-    # Collapsed by default so the sidebar looks clean on first load
-    # User clicks the arrow to expand and enter their key
     with st.expander("⚙️ Settings", expanded=not st.session_state.api_key_set):
 
-        # API Key input inside the expander
         st.markdown("**OpenAI API Key**")
         user_api_key = st.text_input(
             "OpenAI API Key",
@@ -167,10 +168,7 @@ with st.sidebar:
         )
 
         if user_api_key and user_api_key.startswith("sk-"):
-            # Inject key into environment for all os.getenv() calls
             os.environ["OPENAI_API_KEY"] = user_api_key
-            # Patch the OpenAI client in mcp_tools — it was created
-            # at import time before the user entered the key
             try:
                 from src.tools import mcp_tools as _mcp
                 from openai import OpenAI as _OAI
@@ -194,7 +192,6 @@ with st.sidebar:
 
         st.markdown("---")
 
-        # Clear chat button inside the expander
         if st.button("🗑️ Clear chat", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
@@ -228,7 +225,7 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
-    # Ollama — always amber on cloud since it only runs locally
+    # Ollama status
     ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     if "localhost" in ollama_url or "127.0.0.1" in ollama_url:
         st.markdown(
@@ -264,32 +261,13 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
-    # ── Document upload — hidden from UI, kept for admin use ───
-    # The company PDF is pre-loaded into Qdrant Cloud.
-    # Users do not need to upload anything — they just chat.
-    # To re-index documents, use main.py locally with force=True.
-    #
-    # HIDDEN UPLOAD SECTION — uncomment to re-enable if needed:
+    # ── Hidden upload section (admin use via main.py --reindex) ──
+    # To re-index: python -m src.main --reindex
     #
     # st.markdown('<p class="sidebar-section">Upload documents</p>',
     #             unsafe_allow_html=True)
-    # uploaded_files = st.file_uploader(
-    #     "PDF, TXT or DOCX",
-    #     accept_multiple_files=True,
-    #     type=["pdf", "txt", "docx"],
-    #     label_visibility="collapsed",
-    #     key="file_uploader",
-    # )
-    # if st.button("📤 Upload & Index", use_container_width=True, type="primary",
-    #              disabled=not uploaded_files):
-    #     with tempfile.TemporaryDirectory() as tmp_dir:
-    #         for f in uploaded_files:
-    #             dest = os.path.join(tmp_dir, f.name)
-    #             with open(dest, "wb") as out:
-    #                 out.write(f.read())
-    #         upload_documents(data_path=tmp_dir, force=False)
-    #         st.session_state.docs_loaded = True
-    #         st.rerun()
+    # uploaded_files = st.file_uploader(...)
+    # if st.button("📤 Upload & Index", ...): ...
 
     # ── Info ───────────────────────────────────────────────────
     st.markdown("---")
