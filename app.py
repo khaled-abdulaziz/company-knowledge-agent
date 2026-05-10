@@ -151,51 +151,70 @@ with st.sidebar:
     st.markdown("## 🤖 Knowledge Agent")
     st.markdown("---")
 
-    # ── API Key ────────────────────────────────────────────────
-    st.markdown('<p class="sidebar-section">OpenAI API Key</p>', unsafe_allow_html=True)
+    # ── Settings expander — API key + clear chat ───────────────
+    # Collapsed by default so the sidebar looks clean on first load
+    # User clicks the arrow to expand and enter their key
+    with st.expander("⚙️ Settings", expanded=not st.session_state.api_key_set):
 
-    user_api_key = st.text_input(
-        "OpenAI API Key",
-        type="password",
-        placeholder="sk-...",
-        label_visibility="collapsed",
-        help="Your key is used only for this session and never stored."
-    )
+        # API Key input inside the expander
+        st.markdown("**OpenAI API Key**")
+        user_api_key = st.text_input(
+            "OpenAI API Key",
+            type="password",
+            placeholder="sk-...",
+            label_visibility="collapsed",
+            help="Your key is used only for this session and never stored."
+        )
 
-    if user_api_key and user_api_key.startswith("sk-"):
-        os.environ["OPENAI_API_KEY"] = user_api_key
-        try:
-            from src.tools import mcp_tools as _mcp
-            from openai import OpenAI as _OAI
-            _mcp._openai_client = _OAI(api_key=user_api_key)
-            st.session_state.api_key_set = True
-        except Exception:
-            st.session_state.api_key_set = True
+        if user_api_key and user_api_key.startswith("sk-"):
+            # Inject key into environment for all os.getenv() calls
+            os.environ["OPENAI_API_KEY"] = user_api_key
+            # Patch the OpenAI client in mcp_tools — it was created
+            # at import time before the user entered the key
+            try:
+                from src.tools import mcp_tools as _mcp
+                from openai import OpenAI as _OAI
+                _mcp._openai_client = _OAI(api_key=user_api_key)
+                st.session_state.api_key_set = True
+            except Exception:
+                st.session_state.api_key_set = True
 
-        st.markdown(
-            '<span class="status-dot dot-green"></span> API key accepted',
-            unsafe_allow_html=True
-        )
-    elif user_api_key:
-        st.markdown(
-            '<span class="status-dot dot-red"></span> Key should start with sk-',
-            unsafe_allow_html=True
-        )
-        st.session_state.api_key_set = False
-    else:
-        st.markdown(
-            '<span style="font-size:12px;color:#484f58">'
-            'Enter your key above to start. '
-            '<a href="https://platform.openai.com/api-keys" '
-            'target="_blank" style="color:#58a6ff">Get one here →</a>'
-            '</span>',
-            unsafe_allow_html=True
-        )
-        st.session_state.api_key_set = False
+        elif user_api_key:
+            st.caption("⚠️ Key should start with sk-")
+            st.session_state.api_key_set = False
+        else:
+            st.markdown(
+                '<span style="font-size:12px;color:#484f58">'
+                '<a href="https://platform.openai.com/api-keys" '
+                'target="_blank" style="color:#58a6ff">Get a key from OpenAI →</a>'
+                '</span>',
+                unsafe_allow_html=True
+            )
+            st.session_state.api_key_set = False
+
+        st.markdown("---")
+
+        # Clear chat button inside the expander
+        if st.button("🗑️ Clear chat", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
 
     # ── System status ──────────────────────────────────────────
     st.markdown('<p class="sidebar-section">System status</p>', unsafe_allow_html=True)
 
+    # API key status
+    if st.session_state.api_key_set:
+        st.markdown(
+            '<span class="status-dot dot-green"></span> API key accepted',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            '<span class="status-dot dot-red"></span> No API key',
+            unsafe_allow_html=True
+        )
+
+    # Qdrant status
     try:
         from src.db.vector_store import get_qdrant_client
         get_qdrant_client().get_collections()
@@ -209,6 +228,7 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
+    # Ollama — always amber on cloud since it only runs locally
     ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     if "localhost" in ollama_url or "127.0.0.1" in ollama_url:
         st.markdown(
@@ -232,6 +252,7 @@ with st.sidebar:
                 unsafe_allow_html=True
             )
 
+    # Knowledge base status
     if st.session_state.docs_loaded:
         st.markdown(
             '<span class="status-dot dot-green"></span> Knowledge base ready',
@@ -243,98 +264,34 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
-    # ── Document upload ────────────────────────────────────────
-    st.markdown('<p class="sidebar-section">Upload documents</p>', unsafe_allow_html=True)
+    # ── Document upload — hidden from UI, kept for admin use ───
+    # The company PDF is pre-loaded into Qdrant Cloud.
+    # Users do not need to upload anything — they just chat.
+    # To re-index documents, use main.py locally with force=True.
+    #
+    # HIDDEN UPLOAD SECTION — uncomment to re-enable if needed:
+    #
+    # st.markdown('<p class="sidebar-section">Upload documents</p>',
+    #             unsafe_allow_html=True)
+    # uploaded_files = st.file_uploader(
+    #     "PDF, TXT or DOCX",
+    #     accept_multiple_files=True,
+    #     type=["pdf", "txt", "docx"],
+    #     label_visibility="collapsed",
+    #     key="file_uploader",
+    # )
+    # if st.button("📤 Upload & Index", use_container_width=True, type="primary",
+    #              disabled=not uploaded_files):
+    #     with tempfile.TemporaryDirectory() as tmp_dir:
+    #         for f in uploaded_files:
+    #             dest = os.path.join(tmp_dir, f.name)
+    #             with open(dest, "wb") as out:
+    #                 out.write(f.read())
+    #         upload_documents(data_path=tmp_dir, force=False)
+    #         st.session_state.docs_loaded = True
+    #         st.rerun()
 
-    if not st.session_state.api_key_set:
-        st.caption("Enter your API key above to enable uploads.")
-    else:
-        uploaded_files = st.file_uploader(
-            "PDF, TXT or DOCX",
-            accept_multiple_files=True,
-            type=["pdf", "txt", "docx"],
-            label_visibility="collapsed",
-            key="file_uploader",
-        )
-
-        force_reindex = st.checkbox("Force re-index (replace existing)", value=False)
-
-        # DEBUG — tells us exactly what Streamlit sees after you pick a file
-        # We will remove this line once the upload works
-        st.caption(f"🔍 Debug: {len(uploaded_files) if uploaded_files else 0} file(s) detected by Streamlit")
-
-        if uploaded_files:
-            for f in uploaded_files:
-                st.markdown(f"📄 `{f.name}` — {f.size} bytes")
-
-        upload_clicked = st.button(
-            "📤 Upload & Index",
-            use_container_width=True,
-            type="primary",
-            disabled=not uploaded_files,
-        )
-
-        if st.session_state.upload_success:
-            st.success(st.session_state.upload_success)
-        if st.session_state.upload_error:
-            st.error(st.session_state.upload_error)
-
-        if upload_clicked and uploaded_files:
-            st.session_state.upload_success = None
-            st.session_state.upload_error   = None
-
-            progress = st.progress(0, text="Preparing files...")
-
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                for i, f in enumerate(uploaded_files):
-                    dest = os.path.join(tmp_dir, f.name)
-                    with open(dest, "wb") as out:
-                        out.write(f.read())
-                    progress.progress(
-                        int((i + 1) / len(uploaded_files) * 50),
-                        text=f"Saved {f.name}..."
-                    )
-
-                progress.progress(60, text="Indexing into knowledge base...")
-                try:
-                    upload_documents(data_path=tmp_dir, force=force_reindex)
-                    progress.progress(100, text="✅ Done!")
-
-                    st.session_state.docs_loaded    = True
-                    st.session_state.indexed_count  = len(uploaded_files)
-                    st.session_state.upload_success = (
-                        f"✅ {len(uploaded_files)} file(s) indexed! "
-                        f"You can now start chatting."
-                    )
-                    time.sleep(1)
-                    st.rerun()
-
-                except Exception as e:
-                    progress.empty()
-                    st.session_state.upload_error = f"❌ Upload failed: {str(e)}"
-                    st.rerun()
-
-        st.markdown("---")
-        if st.session_state.docs_loaded:
-            st.markdown(
-                '<span class="status-dot dot-green"></span> '
-                'Knowledge base ready — start chatting.',
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                '<span class="status-dot dot-red"></span> '
-                'No documents yet — upload files above.',
-                unsafe_allow_html=True
-            )
-
-    # ── Chat controls ──────────────────────────────────────────
-    st.markdown('<p class="sidebar-section">Chat</p>', unsafe_allow_html=True)
-
-    if st.button("🗑️ Clear chat history", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
-
+    # ── Info ───────────────────────────────────────────────────
     st.markdown("---")
     st.markdown(
         '<p style="font-size:12px;color:#484f58;line-height:1.6">'
@@ -351,8 +308,9 @@ with st.sidebar:
 # Main — Chat area
 # ==============================================================
 
-st.markdown("### 💬 Ask anything about your company")
+st.markdown("### 💬 Ask me")
 
+# Block everything until API key is entered
 if not st.session_state.api_key_set:
     st.markdown("""
     <div class="empty-state">
@@ -363,21 +321,9 @@ if not st.session_state.api_key_set:
             <a href="https://platform.openai.com/api-keys"
                target="_blank" style="color:#3fb950">
                Get an API key from OpenAI →
-            </a>
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    st.stop()
-
-if not st.session_state.docs_loaded:
-    st.markdown("""
-    <div class="empty-state">
-        <h2>Upload documents to start chatting</h2>
-        <p>
-            Use the sidebar on the left to upload your PDF, TXT, or DOCX files.<br>
-            Once indexed, you can ask questions in Arabic or English.<br><br>
-            <span style="color:#d29922">
-                ⬅️ Select files then click Upload & Index in the sidebar.
+            </a><br><br>
+            <span style="color:#484f58">
+                ⬅️ Click the ⚙️ Settings panel in the sidebar to enter your key.
             </span>
         </p>
     </div>
@@ -392,7 +338,7 @@ if not st.session_state.messages:
         <h2>Knowledge base ready — ask anything</h2>
         <p>
             Ask about company policies, employee data, leave rules,<br>
-            attendance records, or anything in your uploaded documents.<br><br>
+            sales records, products, or anything about the company.<br><br>
             <span style="color:#3fb950">Supports Arabic and English.</span>
         </p>
     </div>
