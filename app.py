@@ -35,9 +35,20 @@ st.markdown("""
 
     #MainMenu, footer, header { visibility: hidden; }
 
-    /* ── FIX: Hide the << collapse arrow so sidebar can't be hidden ── */
-    [data-testid="collapsedControl"]          { display: none !important; }
-    button[data-testid="baseButton-header"]   { display: none !important; }
+    /* ── FIX: Force sidebar always open — works on HuggingFace Spaces ── */
+    [data-testid="collapsedControl"]            { display: none !important; }
+    [data-testid="stSidebarCollapseButton"]     { display: none !important; }
+    button[data-testid="baseButton-header"]     { display: none !important; }
+    .st-emotion-cache-1cypcdb                   { display: none !important; }
+
+    /* Force sidebar visible even when Streamlit internally marks it collapsed */
+    [data-testid="stSidebar"][aria-expanded="false"] {
+        display:     flex  !important;
+        margin-left: 0     !important;
+        transform:   none  !important;
+        min-width:   244px !important;
+        width:       244px !important;
+    }
 
     [data-testid="stSidebar"] {
         background-color: #0f1117;
@@ -123,6 +134,37 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ==============================================================
+# JS: Force sidebar open on every load (HuggingFace Spaces fix)
+# HuggingFace remembers the collapsed state in localStorage.
+# This script forcibly reopens it on every page render.
+# ==============================================================
+st.markdown("""
+<script>
+(function() {
+    function forceOpenSidebar() {
+        // Click the collapsed control arrow if it exists
+        var btn = document.querySelector('[data-testid="collapsedControl"]');
+        if (btn) btn.click();
+
+        // Also directly style the sidebar element
+        var sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (sidebar) {
+            sidebar.style.display    = 'flex';
+            sidebar.style.transform  = 'none';
+            sidebar.style.marginLeft = '0';
+            sidebar.style.minWidth   = '244px';
+            sidebar.setAttribute('aria-expanded', 'true');
+        }
+    }
+    // Run immediately, then again after Streamlit finishes rendering
+    forceOpenSidebar();
+    setTimeout(forceOpenSidebar, 500);
+    setTimeout(forceOpenSidebar, 1500);
+})();
+</script>
+""", unsafe_allow_html=True)
+
 
 # ==============================================================
 # Session state initialisation
@@ -155,7 +197,6 @@ with st.sidebar:
     st.markdown("## 🤖 Knowledge Agent")
     st.markdown("---")
 
-    # ── Settings expander — API key + clear chat ───────────────
     with st.expander("⚙️ Settings", expanded=not st.session_state.api_key_set):
 
         st.markdown("**OpenAI API Key**")
@@ -199,77 +240,37 @@ with st.sidebar:
     # ── System status ──────────────────────────────────────────
     st.markdown('<p class="sidebar-section">System status</p>', unsafe_allow_html=True)
 
-    # API key status
     if st.session_state.api_key_set:
-        st.markdown(
-            '<span class="status-dot dot-green"></span> API key accepted',
-            unsafe_allow_html=True
-        )
+        st.markdown('<span class="status-dot dot-green"></span> API key accepted', unsafe_allow_html=True)
     else:
-        st.markdown(
-            '<span class="status-dot dot-red"></span> No API key',
-            unsafe_allow_html=True
-        )
+        st.markdown('<span class="status-dot dot-red"></span> No API key', unsafe_allow_html=True)
 
-    # Qdrant status
     try:
         from src.db.vector_store import get_qdrant_client
         get_qdrant_client().get_collections()
-        st.markdown(
-            '<span class="status-dot dot-green"></span> Qdrant connected',
-            unsafe_allow_html=True
-        )
+        st.markdown('<span class="status-dot dot-green"></span> Qdrant connected', unsafe_allow_html=True)
     except Exception:
-        st.markdown(
-            '<span class="status-dot dot-red"></span> Qdrant offline',
-            unsafe_allow_html=True
-        )
+        st.markdown('<span class="status-dot dot-red"></span> Qdrant offline', unsafe_allow_html=True)
 
-    # Ollama status
     ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     if "localhost" in ollama_url or "127.0.0.1" in ollama_url:
-        st.markdown(
-            '<span class="status-dot dot-amber"></span> Ollama — local only',
-            unsafe_allow_html=True
-        )
+        st.markdown('<span class="status-dot dot-amber"></span> Ollama — local only', unsafe_allow_html=True)
     else:
         try:
             import httpx
             r = httpx.get(f"{ollama_url}/api/tags", timeout=2)
             if r.status_code == 200:
-                st.markdown(
-                    '<span class="status-dot dot-green"></span> Ollama running',
-                    unsafe_allow_html=True
-                )
+                st.markdown('<span class="status-dot dot-green"></span> Ollama running', unsafe_allow_html=True)
             else:
                 raise Exception()
         except Exception:
-            st.markdown(
-                '<span class="status-dot dot-red"></span> Ollama offline',
-                unsafe_allow_html=True
-            )
+            st.markdown('<span class="status-dot dot-red"></span> Ollama offline', unsafe_allow_html=True)
 
-    # Knowledge base status
     if st.session_state.docs_loaded:
-        st.markdown(
-            '<span class="status-dot dot-green"></span> Knowledge base ready',
-            unsafe_allow_html=True
-        )
+        st.markdown('<span class="status-dot dot-green"></span> Knowledge base ready', unsafe_allow_html=True)
     else:
-        st.markdown(
-            '<span class="status-dot dot-red"></span> No documents indexed',
-            unsafe_allow_html=True
-        )
+        st.markdown('<span class="status-dot dot-red"></span> No documents indexed', unsafe_allow_html=True)
 
-    # ── Hidden upload section (admin use via main.py --reindex) ──
-    # To re-index: python -m src.main --reindex
-    #
-    # st.markdown('<p class="sidebar-section">Upload documents</p>',
-    #             unsafe_allow_html=True)
-    # uploaded_files = st.file_uploader(...)
-    # if st.button("📤 Upload & Index", ...): ...
-
-    # ── Info ───────────────────────────────────────────────────
     st.markdown("---")
     st.markdown(
         '<p style="font-size:12px;color:#484f58;line-height:1.6">'
@@ -288,7 +289,6 @@ with st.sidebar:
 
 st.markdown("### 💬 Ask me")
 
-# Block everything until API key is entered
 if not st.session_state.api_key_set:
     st.markdown("""
     <div class="empty-state">
@@ -348,21 +348,16 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-
 # ── Chat input ─────────────────────────────────────────────────
 
 question = st.chat_input("Ask a question in Arabic or English...")
 
 if question:
-    st.session_state.messages.append({
-        "role":    "user",
-        "content": question,
-    })
+    st.session_state.messages.append({"role": "user", "content": question})
 
     with st.spinner("Thinking..."):
         try:
             result = run_agent(question)
-
             st.session_state.messages.append({
                 "role":    "assistant",
                 "content": result["answer"],
@@ -372,7 +367,6 @@ if question:
                     "is_sensitive": result["is_sensitive"],
                 }
             })
-
         except Exception as e:
             st.session_state.messages.append({
                 "role":    "assistant",
