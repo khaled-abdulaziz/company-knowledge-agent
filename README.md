@@ -20,8 +20,8 @@ pinned: false
 
 A company internal chatbot that answers two types of questions:
 
-- **Document questions** → "What is the remote work policy?" — searches company PDFs using RAG
-- **Database questions** → "How many employees are in IT?" — generates and runs SQL on a real database
+- **Document questions** → searches company policy PDFs using RAG
+- **Database questions** → generates and runs SQL on a real MySQL database
 
 Supports **Arabic and English** out of the box.
 
@@ -83,6 +83,7 @@ company_agent_project/
 └── tools/
 ├── mcp_tools.py    # MCP tool registry (all service calls)
 └── custom_tools.py # Utility functions
+
 ---
 
 ## Key Design Decisions
@@ -131,6 +132,7 @@ ollama pull llama3
 ```
 
 ### 5. Add your documents
+
 Drop your PDF / TXT / DOCX files into data/manuals/
 ### 6. Run the app
 ```bash
@@ -158,6 +160,7 @@ MYSQL_PORT             3306
 MYSQL_USER             your_user
 MYSQL_PASSWORD         your_password
 MYSQL_DB               company_db
+MYSQL_SSL              false
 QDRANT_HOST            localhost
 QDRANT_PORT            6333
 QDRANT_COLLECTION      company_docs
@@ -167,17 +170,25 @@ SENSITIVE_KEYWORDS     salary,password,national_id,address,marital_status
 
 ## Example Questions
 
-**English:**
-- "What is the vacation policy?"
-- "How many employees are in the IT department?"
-- "What is Ahmed Alqahtani's salary?"
-- "Show me all products and their prices"
-- "Which city had the most sales in 2025?"
+### 📄 Document questions (PDF policy)
+Upload the company policy PDF then try:
+- "What is the employee leave policy?"
+- "What are the data and security policies?"
+- "What are the customer service standards?"
+- "What does the company sell and where does it operate?"
 
-**Arabic:**
+### 🗄️ Database questions (MySQL)
+- "How many employees do we have?"
+- "What is Ahmed Alqahtani's salary?"
+- "List all departments"
+- "Show me all products and their prices"
+- "Which city had the most sales?"
+
+### 🌐 Arabic questions
 - "ما هي سياسة الإجازات؟"
-- "كم عدد موظفي قسم تقنية المعلومات؟"
+- "كم عدد الموظفين لدينا؟"
 - "ما هو راتب أحمد القحطاني؟"
+- "اعرض لي جميع المنتجات وأسعارها"
 
 ---
 
@@ -190,4 +201,4 @@ Enter it in the sidebar before chatting. Your key is never stored or logged.
 
 ## Author
 
-Built by Khaled abdulaziz · [LinkedIn](https://www.linkedin.com/in/khaled-abdulaziz/) · [GitHub](https://github.com/khaled-abdulaziz)
+Built by Khaled Abdulaziz· [LinkedIn](https://www.linkedin.com/in/khaled-abdulaziz/) · [GitHub](https://github.com/khaled-abdulaziz)
