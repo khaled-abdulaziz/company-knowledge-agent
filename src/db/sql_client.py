@@ -1,5 +1,5 @@
 # ==============================================================
-#MySQL connection 
+# MySQL connection + safe query execution
 # ==============================================================
 
 import os
@@ -12,12 +12,16 @@ load_dotenv()
 # Engine 
 # ==============================================================
 
-_engine = None  
+_engine = None
 
 def get_engine():
     """
     Returns a singleton SQLAlchemy engine.
     Created once and reused across all queries.
+
+    Two modes:
+      - Local  → MYSQL_SSL=false (default) — no SSL
+      - Cloud  → MYSQL_SSL=true            — SSL required (Aiven)
     """
     global _engine
     if _engine is None:
@@ -27,17 +31,38 @@ def get_engine():
         port     = os.getenv("MYSQL_PORT", "3306")
         db       = os.getenv("MYSQL_DB")
 
-        connection_string = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
-        _engine = create_engine(
-            connection_string,
-            pool_pre_ping=True,   
-            pool_recycle=3600     
+        connection_string = (
+            f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
         )
+
+        
+        ssl_required = os.getenv("MYSQL_SSL", "false").lower() == "true"
+
+        if ssl_required:
+            
+            print(f"☁️ MySQL Cloud mode — SSL enabled → {host}:{port}/{db}")
+            _engine = create_engine(
+                connection_string,
+                connect_args={
+                    "ssl": {"ssl_mode": "REQUIRED"}
+                },
+                pool_pre_ping=True,    
+                pool_recycle=3600      
+            )
+        else:
+            # 🖥️ Local mode — no SSL needed
+            print(f"🖥️ MySQL Local mode → {host}:{port}/{db}")
+            _engine = create_engine(
+                connection_string,
+                pool_pre_ping=True,    
+                pool_recycle=3600     
+            )
+
     return _engine
 
 
 # ==============================================================
-# Safety Guard — only SELECT allowed
+# Safety Guard 
 # ==============================================================
 
 
@@ -47,23 +72,28 @@ _FORBIDDEN_KEYWORDS = {
     "grant", "revoke", "exec", "execute"
 }
 
-def is_safe_query(query: str) -> bool:    
+def is_safe_query(query: str) -> bool:
     """
     Validates that the query is a read-only SELECT.
     Blocks any mutation or destructive SQL.
     Returns True if safe, False otherwise.
+
+    Examples:
+        is_safe_query("SELECT * FROM employees") → True
+        is_safe_query("DROP TABLE employees")    → False
+        is_safe_query("DELETE FROM employees")   → False
     """
     cleaned = query.strip().lower()
 
-
+    
     if not cleaned.startswith("select"):
         return False
 
-
+    
     for word in _FORBIDDEN_KEYWORDS:
         if word in cleaned:
             return False
-      
+
     return True
 
 
@@ -71,7 +101,7 @@ def is_safe_query(query: str) -> bool:
 # Query Executor
 # ==============================================================
 
-def run_query(query: str) -> list[dict] | str:  
+def run_query(query: str) -> list[dict] | str:
     """
     Safely executes a SQL SELECT query.
 
@@ -82,23 +112,27 @@ def run_query(query: str) -> list[dict] | str:
         list[dict]: Rows as list of dictionaries if successful.
         str: Error/warning message if blocked or failed.
 
-    Example:
-        run_query("SELECT name, department FROM employees WHERE department = 'HR'")
-        → [{"name": "Ahmed", "department": "HR"}, ...]
-    """
+    Examples:
+        run_query("SELECT full_name, department_id FROM employees LIMIT 5")
+        → [{"full_name": "Ahmed", "department_id": 1}, ...]
 
-   
+        run_query("DROP TABLE employees")
+        → "❌ Query blocked: only SELECT statements are allowed."
+    """
+    
     if not is_safe_query(query):
         return "❌ Query blocked: only SELECT statements are allowed. No data was modified."
 
-
+    
     try:
         engine = get_engine()
-        with engine.connect() as conn:   
-            result = conn.execute(text(query)) 
-            rows = [dict(row._mapping) for row in result] 
+        with engine.connect() as conn:
+            result = conn.execute(text(query))
+            
+            
+            rows = [dict(row._mapping) for row in result]
 
-
+        
         if not rows:
             return "⚠️ Query executed successfully but returned no results."
 
