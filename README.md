@@ -123,7 +123,7 @@ cp .env.example .env
 
 ### 4. Start required services
 ```bash
-# Qdrant (vector database)
+# Qdrant (vector database).
 docker run -p 6333:6333 -v qdrant_storage:/qdrant/storage qdrant/qdrant
 
 # Ollama (local LLM for sensitive queries)
