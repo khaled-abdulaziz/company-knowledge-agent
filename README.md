@@ -14,7 +14,7 @@ pinned: false
 > **Live Demo** → [Try it on Hugging Face](https://huggingface.co/spaces/khaledxd/company-knowledge-agent)  
 > **Built with** LangGraph · LlamaIndex · Qdrant · MySQL · GPT-4o · Ollama · Streamlit
 
----
+----
 
 ## What is this?
 
